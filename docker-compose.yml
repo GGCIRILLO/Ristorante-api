@@ -1,0 +1,65 @@
+services:
+  app:
+    build: 
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: ristorante-api
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+      - redis
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=ristorante
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - .:/app
+    networks:
+      - ristorante-network
+
+  db:
+    image: postgres:15-alpine
+    container_name: ristorante-api-db
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ristorante
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ristorante-network
+
+  adminer:
+    image: adminer
+    container_name: ristorante-adminer
+    restart: always
+    ports:
+      - "8082:8080"
+    depends_on:
+      - db
+    networks:
+      - ristorante-network
+
+  redis:
+    image: redis:alpine
+    container_name: ristorante-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - ristorante-network
+
+networks:
+  ristorante-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
