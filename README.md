@@ -38,11 +38,11 @@ Lo script  manage.sh  semplifica le operazioni comuni. Ecco i comandi disponibil
 ./manage.sh up   	# Avvia i container (equivale a docker-compose up -d)
 ./manage.sh start 	# Avvia tutti i container in background (docker-compose up -d)
 ./manage.sh stop 	# Ferma e rimuove i container (docker-compose down)
-./manage.sh rebuild # Ricostruisce i container senza rimuovere volumi
+./manage.sh rebuild 	# Ricostruisce i container senza rimuovere volumi
 ./manage.sh reset 	# Ferma, rimuove i volumi, ricostruisce tutto da zero 
 ./manage.sh logs 	# Mostra i log del container  ristorante-api-db
 ./manage.sh shell 	# Accede alla shell del container PostgreSQL
-./manage.sh seed-check # Esegue una query per verificare il contenuto della tabella  ristorante(complete_seed.sql)
+./manage.sh seed-check 	# Esegue una query per verificare il contenuto della tabella  ristorante(complete_seed.sql)
 ```
 Allora, per eseguire l’intero progetto (API + PostgreSQL + Redis):
 ```bash
