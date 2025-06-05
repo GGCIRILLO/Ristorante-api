@@ -37,6 +37,11 @@ func SetupRoutes(db *database.DB) *chi.Mux {
 	ordineCache := cache.NewOrdineCache(db.Redis.Client)
 	ordineHandler := handlers.NewOrdineHandler(ordineRepo, ordineCache)
 
+	// Pietanze
+	pietanzaRepo := repository.NewPietanzaRepository(db.Pool)
+	pietanzaCache := cache.NewPietanzaCache(db.Redis.Client)
+	pietanzaHandler := handlers.NewPietanzaHandler(pietanzaRepo, pietanzaCache)
+
 	// Monitoring Routes
 	r.Route("/monitoring", func(r chi.Router) {
 		r.Get("/redis", monitoringHandler.GetRedisStatus)
@@ -68,6 +73,15 @@ func SetupRoutes(db *database.DB) *chi.Mux {
 			r.Post("/", ordineHandler.CreateOrdine)
 			r.Patch("/{id}", ordineHandler.UpdateStatoOrdine)
 			r.Delete("/{id}", ordineHandler.DeleteOrdine)
+		})
+
+		r.Route("/pietanze", func(r chi.Router) {
+			r.Get("/", pietanzaHandler.GetPietanze)
+			r.Get("/{id}", pietanzaHandler.GetPietanza)
+			r.Post("/", pietanzaHandler.CreatePietanza)
+			r.Put("/{id}", pietanzaHandler.UpdatePietanza)
+			r.Delete("/{id}", pietanzaHandler.DeletePietanza)
+			r.Post("/ordine/{id_ordine}", pietanzaHandler.AddPietanzaToOrdine)
 		})
 
 	})

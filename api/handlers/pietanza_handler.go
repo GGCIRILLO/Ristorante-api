@@ -1,300 +1,275 @@
 package handlers
 
-// import (
-// 	"encoding/json"
-// 	"log"
-// 	"net/http"
-// 	"ristorante-api/database"
-// 	"ristorante-api/models"
-// 	"strconv"
+import (
+	"encoding/json"
+	"log"
+	"net/http"
+	"ristorante-api/cache"
+	"ristorante-api/models"
+	"ristorante-api/repository"
+	"strconv"
 
-// 	"github.com/go-chi/chi/v5"
-// )
+	"github.com/go-chi/chi/v5"
+)
 
-// // PietanzaHandler gestisce le richieste relative alle pietanze
-// type PietanzaHandler struct {
-// 	DB *database.DB
-// }
+// PietanzaHandler gestisce le richieste relative alle pietanze
+type PietanzaHandler struct {
+	repo  *repository.PietanzaRepository
+	cache *cache.PietanzaCache
+}
 
-// // NewPietanzaHandler crea un nuovo handler per le pietanze
-// func NewPietanzaHandler(db *database.DB) *PietanzaHandler {
-// 	return &PietanzaHandler{
-// 		DB: db,
-// 	}
-// }
+// NewPietanzaHandler crea un nuovo handler per le pietanze
+func NewPietanzaHandler(repo *repository.PietanzaRepository, cache *cache.PietanzaCache) *PietanzaHandler {
+	return &PietanzaHandler{
+		repo:  repo,
+		cache: cache,
+	}
+}
 
-// // GetPietanze restituisce tutte le pietanze disponibili
-// func (h *PietanzaHandler) GetPietanze(w http.ResponseWriter, r *http.Request) {
-// 	ctx := r.Context()
-// 	pietanze := []models.Pietanza{}
+// GetPietanze restituisce tutte le pietanze disponibili
+func (h *PietanzaHandler) GetPietanze(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 
-// 	// Tenta di recuperare le pietanze dalla cache
-// 	cached, found, err := h.DB.Redis.GetPietanzeCache(ctx)
-// 	if err != nil {
-// 		log.Printf("Errore nell'accesso alla cache: %v", err)
-// 		// Continua con il database in caso di errore della cache
-// 	} else if found {
-// 		// Usa i dati dalla cache
-// 		log.Println("Servendo le pietanze dalla cache Redis")
-// 		w.Header().Set("Content-Type", "application/json")
-// 		json.NewEncoder(w).Encode(cached)
-// 		return
-// 	}
+	// Tenta di recuperare le pietanze dalla cache
+	cached, found, err := h.cache.GetAll(ctx)
+	if err != nil {
+		log.Printf("Errore nell'accesso alla cache: %v", err)
+		// Continua con il database in caso di errore della cache
+	} else if found {
+		// Usa i dati dalla cache
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(cached)
+		return
+	}
 
-// 	// Cache miss o errore, recupera dal database
-// 	log.Println("Cache miss, recupero le pietanze dal database")
-// 	rows, err := h.DB.Pool.Query(ctx, `
-// 		SELECT p.id_pietanza, p.nome, p.prezzo, p.id_categoria, p.disponibile
-// 		FROM pietanza p
-// 	`)
-// 	if err != nil {
-// 		http.Error(w, "Errore nel recupero delle pietanze", http.StatusInternalServerError)
-// 		log.Printf("Errore nel recupero delle pietanze: %v", err)
-// 		return
-// 	}
-// 	defer rows.Close()
+	// Cache miss o errore, recupera dal database
+	pietanze, err := h.repo.GetAll(ctx)
+	if err != nil {
+		http.Error(w, "Errore nel recupero delle pietanze", http.StatusInternalServerError)
+		log.Printf("Errore nel recupero delle pietanze: %v", err)
+		return
+	}
 
-// 	for rows.Next() {
-// 		var p models.Pietanza
-// 		err := rows.Scan(&p.ID, &p.Nome, &p.Prezzo, &p.IDCategoria, &p.Disponibile)
-// 		if err != nil {
-// 			http.Error(w, "Errore nella lettura delle pietanze", http.StatusInternalServerError)
-// 			log.Printf("Errore nella lettura delle pietanze: %v", err)
-// 			return
-// 		}
-// 		pietanze = append(pietanze, p)
-// 	}
+	// Salva i risultati in cache per le future richieste
+	if err := h.cache.SetAll(ctx, pietanze); err != nil {
+		log.Printf("Errore nell'aggiornamento della cache: %v", err)
+		// Continua comunque
+	}
 
-// 	if err := rows.Err(); err != nil {
-// 		http.Error(w, "Errore nell'iterazione sui risultati", http.StatusInternalServerError)
-// 		log.Printf("Errore nell'iterazione sui risultati: %v", err)
-// 		return
-// 	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(pietanze)
+}
 
-// 	// Salva i risultati in cache per le future richieste
-// 	if err := h.DB.Redis.SetPietanzeCache(ctx, pietanze); err != nil {
-// 		log.Printf("Errore nell'aggiornamento della cache: %v", err)
-// 		// Continua comunque
-// 	}
+// GetPietanza restituisce una singola pietanza per ID
+func (h *PietanzaHandler) GetPietanza(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "ID non valido", http.StatusBadRequest)
+		return
+	}
 
-// 	w.Header().Set("Content-Type", "application/json")
-// 	json.NewEncoder(w).Encode(pietanze)
-// }
+	// Tenta di recuperare la pietanza dalla cache
+	pietanza, found, err := h.cache.GetByID(ctx, id)
+	if err != nil {
+		log.Printf("Errore nell'accesso alla cache: %v", err)
+		// Continua con il database in caso di errore della cache
+	} else if found {
+		// Usa i dati dalla cache
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(pietanza)
+		return
+	}
 
-// // GetPietanza restituisce una singola pietanza per ID
-// func (h *PietanzaHandler) GetPietanza(w http.ResponseWriter, r *http.Request) {
-// 	ctx := r.Context()
-// 	idStr := chi.URLParam(r, "id")
-// 	id, err := strconv.Atoi(idStr)
-// 	if err != nil {
-// 		http.Error(w, "ID non valido", http.StatusBadRequest)
-// 		return
-// 	}
+	// Cache miss o errore, recupera dal database
+	pietanza, err = h.repo.GetByID(ctx, id)
+	if err != nil {
+		http.Error(w, "Pietanza non trovata", http.StatusNotFound)
+		log.Printf("Errore nel recupero della pietanza: %v", err)
+		return
+	}
 
-// 	// Tenta di recuperare la pietanza dalla cache
-// 	pietanza, found, err := h.DB.Redis.GetPietanzaCache(ctx, id)
-// 	if err != nil {
-// 		log.Printf("Errore nell'accesso alla cache: %v", err)
-// 		// Continua con il database in caso di errore della cache
-// 	} else if found {
-// 		// Usa i dati dalla cache
-// 		log.Printf("Servendo la pietanza ID %d dalla cache Redis", id)
-// 		w.Header().Set("Content-Type", "application/json")
-// 		json.NewEncoder(w).Encode(pietanza)
-// 		return
-// 	}
+	// Salva in cache per le future richieste
+	if err := h.cache.SetByID(ctx, id, pietanza); err != nil {
+		log.Printf("Errore nell'aggiornamento della cache: %v", err)
+		// Continua comunque
+	}
 
-// 	// Cache miss o errore, recupera dal database
-// 	var p models.Pietanza
-// 	err = h.DB.Pool.QueryRow(ctx, `
-// 		SELECT p.id_pietanza, p.nome, p.prezzo, p.id_categoria, p.disponibile
-// 		FROM pietanza p
-// 		WHERE p.id_pietanza = $1
-// 	`, id).Scan(&p.ID, &p.Nome, &p.Prezzo, &p.IDCategoria, &p.Disponibile)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(pietanza)
+}
 
-// 	if err != nil {
-// 		http.Error(w, "Pietanza non trovata", http.StatusNotFound)
-// 		log.Printf("Errore nel recupero della pietanza: %v", err)
-// 		return
-// 	}
+// CreatePietanza crea una nuova pietanza
+func (h *PietanzaHandler) CreatePietanza(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var p models.Pietanza
 
-// 	// Salva in cache per le future richieste
-// 	if err := h.DB.Redis.SetPietanzaCache(ctx, id, p); err != nil {
-// 		log.Printf("Errore nell'aggiornamento della cache: %v", err)
-// 		// Continua comunque
-// 	}
+	// Decodifica il JSON della richiesta
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+		http.Error(w, "Formato JSON non valido", http.StatusBadRequest)
+		log.Printf("Errore nella decodifica JSON: %v", err)
+		return
+	}
 
-// 	w.Header().Set("Content-Type", "application/json")
-// 	json.NewEncoder(w).Encode(p)
-// }
+	// Validazione base
+	if p.Nome == "" || p.Prezzo <= 0 {
+		http.Error(w, "Nome e prezzo sono campi obbligatori", http.StatusBadRequest)
+		return
+	}
 
-// // CreatePietanza crea una nuova pietanza
-// func (h *PietanzaHandler) CreatePietanza(w http.ResponseWriter, r *http.Request) {
-// 	ctx := r.Context()
-// 	var p models.Pietanza
+	// Inserimento nel database
+	err := h.repo.Create(ctx, &p)
+	if err != nil {
+		http.Error(w, "Errore nella creazione della pietanza", http.StatusInternalServerError)
+		log.Printf("Errore nella creazione della pietanza: %v", err)
+		return
+	}
 
-// 	// Decodifica il JSON della richiesta
-// 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-// 		http.Error(w, "Formato JSON non valido", http.StatusBadRequest)
-// 		log.Printf("Errore nella decodifica JSON: %v", err)
-// 		return
-// 	}
+	// Invalida la cache delle pietanze
+	if err := h.cache.InvalidateAll(ctx); err != nil {
+		log.Printf("Errore nell'invalidazione della cache: %v", err)
+	}
 
-// 	// Validazione base
-// 	if p.Nome == "" || p.Prezzo <= 0 {
-// 		http.Error(w, "Nome e prezzo sono campi obbligatori", http.StatusBadRequest)
-// 		return
-// 	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(p)
+}
 
-// 	// Inserimento nel database
-// 	err := h.DB.Pool.QueryRow(ctx, `
-// 		INSERT INTO pietanza (nome, prezzo, id_categoria, disponibile)
-// 		VALUES ($1, $2, $3, $4)
-// 		RETURNING id_pietanza
-// 	`, p.Nome, p.Prezzo, p.IDCategoria, p.Disponibile).Scan(&p.ID)
+// UpdatePietanza aggiorna una pietanza esistente
+func (h *PietanzaHandler) UpdatePietanza(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "ID non valido", http.StatusBadRequest)
+		return
+	}
 
-// 	if err != nil {
-// 		http.Error(w, "Errore nella creazione della pietanza", http.StatusInternalServerError)
-// 		log.Printf("Errore nella creazione della pietanza: %v", err)
-// 		return
-// 	}
+	var p models.Pietanza
 
-// 	// Invalida la cache delle pietanze
-// 	if err := h.DB.Redis.InvalidatePietanzeCache(ctx); err != nil {
-// 		log.Printf("Errore nell'invalidazione della cache: %v", err)
-// 	}
+	// Decodifica il JSON della richiesta
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+		http.Error(w, "Formato JSON non valido", http.StatusBadRequest)
+		log.Printf("Errore nella decodifica JSON: %v", err)
+		return
+	}
 
-// 	w.Header().Set("Content-Type", "application/json")
-// 	w.WriteHeader(http.StatusCreated)
-// 	json.NewEncoder(w).Encode(p)
-// }
+	// Validazione base
+	if p.Nome == "" || p.Prezzo <= 0 {
+		http.Error(w, "Nome e prezzo sono campi obbligatori", http.StatusBadRequest)
+		return
+	}
 
-// // UpdatePietanza aggiorna una pietanza esistente
-// func (h *PietanzaHandler) UpdatePietanza(w http.ResponseWriter, r *http.Request) {
-// 	ctx := r.Context()
-// 	idStr := chi.URLParam(r, "id")
-// 	id, err := strconv.Atoi(idStr)
-// 	if err != nil {
-// 		http.Error(w, "ID non valido", http.StatusBadRequest)
-// 		return
-// 	}
+	// Verifica che la pietanza esista
+	exists, err := h.repo.Exists(ctx, id)
+	if err != nil || !exists {
+		http.Error(w, "Pietanza non trovata", http.StatusNotFound)
+		return
+	}
 
-// 	var p models.Pietanza
+	// Imposta l'ID e aggiorna nel database
+	p.ID = id
+	err = h.repo.Update(ctx, &p)
+	if err != nil {
+		http.Error(w, "Errore nell'aggiornamento della pietanza", http.StatusInternalServerError)
+		log.Printf("Errore nell'aggiornamento della pietanza: %v", err)
+		return
+	}
 
-// 	// Decodifica il JSON della richiesta
-// 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-// 		http.Error(w, "Formato JSON non valido", http.StatusBadRequest)
-// 		log.Printf("Errore nella decodifica JSON: %v", err)
-// 		return
-// 	}
+	// Invalida la cache per questa pietanza e per l'elenco completo
+	if err := h.cache.InvalidateByID(ctx, id); err != nil {
+		log.Printf("Errore nell'invalidazione della cache pietanza: %v", err)
+	}
+	if err := h.cache.InvalidateAll(ctx); err != nil {
+		log.Printf("Errore nell'invalidazione della cache pietanze: %v", err)
+	}
 
-// 	// Validazione base
-// 	if p.Nome == "" || p.Prezzo <= 0 {
-// 		http.Error(w, "Nome e prezzo sono campi obbligatori", http.StatusBadRequest)
-// 		return
-// 	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(p)
+}
 
-// 	// Verifica che la pietanza esista
-// 	var exists bool
-// 	err = h.DB.Pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pietanza WHERE id_pietanza = $1)", id).Scan(&exists)
-// 	if err != nil || !exists {
-// 		http.Error(w, "Pietanza non trovata", http.StatusNotFound)
-// 		return
-// 	}
+// DeletePietanza elimina una pietanza
+func (h *PietanzaHandler) DeletePietanza(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "ID non valido", http.StatusBadRequest)
+		return
+	}
 
-// 	// Aggiornamento nel database
-// 	_, err = h.DB.Pool.Exec(ctx, `
-// 		UPDATE pietanza
-// 		SET nome = $1, prezzo = $2, id_categoria = $3, disponibile = $4
-// 		WHERE id_pietanza = $5
-// 	`, p.Nome, p.Prezzo, p.IDCategoria, p.Disponibile, id)
+	// Verifica che la pietanza esista
+	exists, err := h.repo.Exists(ctx, id)
+	if err != nil || !exists {
+		http.Error(w, "Pietanza non trovata", http.StatusNotFound)
+		return
+	}
 
-// 	if err != nil {
-// 		http.Error(w, "Errore nell'aggiornamento della pietanza", http.StatusInternalServerError)
-// 		log.Printf("Errore nell'aggiornamento della pietanza: %v", err)
-// 		return
-// 	}
+	// Eliminazione dal database
+	err = h.repo.Delete(ctx, id)
+	if err != nil {
+		http.Error(w, "Errore nell'eliminazione della pietanza", http.StatusInternalServerError)
+		log.Printf("Errore nell'eliminazione della pietanza: %v", err)
+		return
+	}
 
-// 	// Invalida la cache per questa pietanza e per l'elenco completo
-// 	if err := h.DB.Redis.InvalidatePietanzaCache(ctx, id); err != nil {
-// 		log.Printf("Errore nell'invalidazione della cache pietanza: %v", err)
-// 	}
-// 	if err := h.DB.Redis.InvalidatePietanzeCache(ctx); err != nil {
-// 		log.Printf("Errore nell'invalidazione della cache pietanze: %v", err)
-// 	}
+	// Invalida la cache per questa pietanza e per l'elenco completo
+	if err := h.cache.InvalidateByID(ctx, id); err != nil {
+		log.Printf("Errore nell'invalidazione della cache pietanza: %v", err)
+	}
+	if err := h.cache.InvalidateAll(ctx); err != nil {
+		log.Printf("Errore nell'invalidazione della cache pietanze: %v", err)
+	}
 
-// 	// Imposta l'ID nella risposta
-// 	p.ID = id
+	// Risposta 204 No Content
+	w.WriteHeader(http.StatusNoContent)
+}
 
-// 	w.Header().Set("Content-Type", "application/json")
-// 	json.NewEncoder(w).Encode(p)
-// }
+// AddPietanzaToOrdine aggiunge una pietanza a un ordine esistente
+func (h *PietanzaHandler) AddPietanzaToOrdine(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	idOrdineStr := chi.URLParam(r, "id_ordine")
+	idOrdine, err := strconv.Atoi(idOrdineStr)
+	if err != nil {
+		http.Error(w, "ID ordine non valido", http.StatusBadRequest)
+		return
+	}
 
-// // DeletePietanza elimina una pietanza
-// func (h *PietanzaHandler) DeletePietanza(w http.ResponseWriter, r *http.Request) {
-// 	ctx := r.Context()
-// 	idStr := chi.URLParam(r, "id")
-// 	id, err := strconv.Atoi(idStr)
-// 	if err != nil {
-// 		http.Error(w, "ID non valido", http.StatusBadRequest)
-// 		return
-// 	}
+	// Struttura per la richiesta
+	var requestBody struct {
+		IDPietanza int `json:"id_pietanza"`
+		Quantita   int `json:"quantita"`
+	}
 
-// 	// Verifica che la pietanza esista
-// 	var exists bool
-// 	err = h.DB.Pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pietanza WHERE id_pietanza = $1)", id).Scan(&exists)
-// 	if err != nil || !exists {
-// 		http.Error(w, "Pietanza non trovata", http.StatusNotFound)
-// 		return
-// 	}
+	// Decodifica il JSON della richiesta
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		http.Error(w, "Formato JSON non valido", http.StatusBadRequest)
+		log.Printf("Errore nella decodifica JSON: %v", err)
+		return
+	}
 
-// 	// Eliminazione dal database
-// 	_, err = h.DB.Pool.Exec(ctx, "DELETE FROM pietanza WHERE id_pietanza = $1", id)
-// 	if err != nil {
-// 		http.Error(w, "Errore nell'eliminazione della pietanza", http.StatusInternalServerError)
-// 		log.Printf("Errore nell'eliminazione della pietanza: %v", err)
-// 		return
-// 	}
+	// Validazione base
+	if requestBody.IDPietanza <= 0 || requestBody.Quantita <= 0 {
+		http.Error(w, "ID pietanza e quantità devono essere maggiori di zero", http.StatusBadRequest)
+		return
+	}
 
-// 	// Invalida la cache per questa pietanza e per l'elenco completo
-// 	if err := h.DB.Redis.InvalidatePietanzaCache(ctx, id); err != nil {
-// 		log.Printf("Errore nell'invalidazione della cache pietanza: %v", err)
-// 	}
-// 	if err := h.DB.Redis.InvalidatePietanzeCache(ctx); err != nil {
-// 		log.Printf("Errore nell'invalidazione della cache pietanze: %v", err)
-// 	}
+	// Verifica che la pietanza esista
+	exists, err := h.repo.Exists(ctx, requestBody.IDPietanza)
+	if err != nil || !exists {
+		http.Error(w, "Pietanza non trovata", http.StatusNotFound)
+		return
+	}
 
-// 	// Risposta 204 No Content
-// 	w.WriteHeader(http.StatusNoContent)
-// }
+	// Aggiungi la pietanza all'ordine
+	err = h.repo.AddPietanzaToOrdine(ctx, idOrdine, requestBody.IDPietanza, requestBody.Quantita)
+	if err != nil {
+		http.Error(w, "Errore nell'aggiunta della pietanza all'ordine", http.StatusInternalServerError)
+		log.Printf("Errore nell'aggiunta della pietanza all'ordine: %v", err)
+		return
+	}
 
-// // HealthCheck verifica lo stato dell'API
-// func (h *PietanzaHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
-// 	type HealthResponse struct {
-// 		Status  string `json:"status"`
-// 		Message string `json:"message"`
-// 	}
-
-// 	// Verifica connessione al database
-// 	err := h.DB.Pool.Ping(r.Context())
-// 	if err != nil {
-// 		response := HealthResponse{
-// 			Status:  "error",
-// 			Message: "Database connection failed",
-// 		}
-// 		w.Header().Set("Content-Type", "application/json")
-// 		w.WriteHeader(http.StatusServiceUnavailable)
-// 		json.NewEncoder(w).Encode(response)
-// 		return
-// 	}
-
-// 	// Risposta OK
-// 	response := HealthResponse{
-// 		Status:  "ok",
-// 		Message: "Service is healthy",
-// 	}
-
-// 	w.Header().Set("Content-Type", "application/json")
-// 	w.WriteHeader(http.StatusOK)
-// 	json.NewEncoder(w).Encode(response)
-// }
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Pietanza aggiunta all'ordine con successo"})
+}

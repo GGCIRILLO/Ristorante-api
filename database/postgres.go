@@ -237,7 +237,8 @@ func (db *DB) InitSchema() error {
 		  parte_di_menu BOOLEAN NOT NULL DEFAULT FALSE,
 		  id_menu INTEGER DEFAULT NULL,
 		  FOREIGN KEY (id_ordine) REFERENCES ordine (id_ordine) ON DELETE CASCADE,
-		  FOREIGN KEY (id_pietanza) REFERENCES pietanza (id_pietanza) ON DELETE CASCADE
+		  FOREIGN KEY (id_pietanza) REFERENCES pietanza (id_pietanza) ON DELETE CASCADE,
+		  UNIQUE (id_ordine, id_pietanza)
 		)
 	`)
 	if err != nil {
