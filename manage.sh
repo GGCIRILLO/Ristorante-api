@@ -44,14 +44,6 @@ reset() {
   docker compose up -d
 
   echo "⏳ Attesa dell'avvio del servizio..."
-  sleep 5
-
-  echo "📂 Verifica presenza del file di seed..."
-  if docker exec "$CONTAINER_NAME" test -f /app/database/migrations/complete_seed.sql; then
-    echo "✅ File di seed trovato!"
-  else
-    echo "❌ ATTENZIONE: complete_seed.sql mancante nel container!"
-  fi
 }
 
 logs() {
