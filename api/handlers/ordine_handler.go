@@ -119,3 +119,30 @@ func (h *OrdineHandler) DeleteOrdine(w http.ResponseWriter, r *http.Request) {
 	h.Cache.Invalidate(ctx)
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// CalcolaScontrino calcola il conto per un tavolo e segna l'ordine come pagato
+func (h *OrdineHandler) CalcolaScontrino(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	idTavoloStr := chi.URLParam(r, "id_tavolo")
+	idTavolo, err := strconv.Atoi(idTavoloStr)
+	if err != nil {
+		http.Error(w, "ID tavolo non valido", http.StatusBadRequest)
+		return
+	}
+
+	// Calcola lo scontrino
+	scontrino, err := h.Repo.CalcolaScontrino(ctx, idTavolo)
+	if err != nil {
+		http.Error(w, "Errore nel calcolo dello scontrino", http.StatusInternalServerError)
+		log.Printf("Errore nel calcolo dello scontrino: %v", err)
+		return
+	}
+
+	// Invalida la cache degli ordini
+	if h.Cache != nil {
+		h.Cache.Invalidate(ctx)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(scontrino)
+}

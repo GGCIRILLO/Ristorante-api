@@ -203,6 +203,7 @@ func (db *DB) InitSchema() error {
 		  PRIMARY KEY (id_menu, id_pietanza),
 		  FOREIGN KEY (id_menu) REFERENCES menu_fisso (id_menu) ON DELETE CASCADE,
 		  FOREIGN KEY (id_pietanza) REFERENCES pietanza (id_pietanza) ON DELETE CASCADE
+		  UNIQUE (id_menu, id_pietanza)
 		)
 	`)
 	if err != nil {
@@ -238,7 +239,7 @@ func (db *DB) InitSchema() error {
 		  id_menu INTEGER DEFAULT NULL,
 		  FOREIGN KEY (id_ordine) REFERENCES ordine (id_ordine) ON DELETE CASCADE,
 		  FOREIGN KEY (id_pietanza) REFERENCES pietanza (id_pietanza) ON DELETE CASCADE,
-		  UNIQUE (id_ordine, id_pietanza)
+		  UNIQUE (id_ordine, id_pietanza, parte_di_menu, id_menu)
 		)
 	`)
 	if err != nil {

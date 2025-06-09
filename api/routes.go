@@ -37,10 +37,22 @@ func SetupRoutes(db *database.DB) *chi.Mux {
 	ordineCache := cache.NewOrdineCache(db.Redis.Client)
 	ordineHandler := handlers.NewOrdineHandler(ordineRepo, ordineCache)
 
+	// Cache
+	ingredienteCache := cache.NewIngredienteCache(db.Redis.Client)
+	pietanzaCache := cache.NewPietanzaCache(db.Redis.Client)
+	ricettaCache := cache.NewRicettaCache(db.Redis.Client)
+	menuFissoCache := cache.NewMenuFissoCache(db.Redis.Client)
+
 	// Pietanze
 	pietanzaRepo := repository.NewPietanzaRepository(db.Pool)
-	pietanzaCache := cache.NewPietanzaCache(db.Redis.Client)
-	pietanzaHandler := handlers.NewPietanzaHandler(pietanzaRepo, pietanzaCache)
+	ricettaRepo := repository.NewRicettaRepository(db.Pool, ricettaCache)
+
+	// Menu Fissi
+	menuFissoRepo := repository.NewMenuFissoRepository(db.Pool)
+	menuFissoHandler := handlers.NewMenuFissoHandler(menuFissoRepo, menuFissoCache)
+
+	// Pietanza Handler
+	pietanzaHandler := handlers.NewPietanzaHandler(pietanzaRepo, pietanzaCache, ricettaRepo, menuFissoRepo, ingredienteCache)
 
 	// Monitoring Routes
 	r.Route("/monitoring", func(r chi.Router) {
@@ -73,6 +85,7 @@ func SetupRoutes(db *database.DB) *chi.Mux {
 			r.Post("/", ordineHandler.CreateOrdine)
 			r.Patch("/{id}", ordineHandler.UpdateStatoOrdine)
 			r.Delete("/{id}", ordineHandler.DeleteOrdine)
+			r.Get("/tavolo/{id_tavolo}/scontrino", ordineHandler.CalcolaScontrino)
 		})
 
 		r.Route("/pietanze", func(r chi.Router) {
@@ -82,6 +95,18 @@ func SetupRoutes(db *database.DB) *chi.Mux {
 			r.Put("/{id}", pietanzaHandler.UpdatePietanza)
 			r.Delete("/{id}", pietanzaHandler.DeletePietanza)
 			r.Post("/ordine/{id_ordine}", pietanzaHandler.AddPietanzaToOrdine)
+			r.Post("/menu-fisso/ordine/{id_ordine}", pietanzaHandler.AddMenuFissoToOrdine)
+		})
+
+		r.Route("/menu-fissi", func(r chi.Router) {
+			r.Get("/", menuFissoHandler.GetMenuFissi)
+			r.Get("/{id}", menuFissoHandler.GetMenuFisso)
+			r.Post("/", menuFissoHandler.CreateMenuFisso)
+			r.Put("/{id}", menuFissoHandler.UpdateMenuFisso)
+			r.Delete("/{id}", menuFissoHandler.DeleteMenuFisso)
+			r.Get("/{id}/composizione", menuFissoHandler.GetComposizione)
+			r.Post("/{id}/pietanza", menuFissoHandler.AddPietanzaToMenu)
+			r.Delete("/{id}/pietanza/{id_pietanza}", menuFissoHandler.RemovePietanzaFromMenu)
 		})
 
 	})

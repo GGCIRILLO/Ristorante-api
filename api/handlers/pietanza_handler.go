@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"ristorante-api/cache"
@@ -14,15 +15,27 @@ import (
 
 // PietanzaHandler gestisce le richieste relative alle pietanze
 type PietanzaHandler struct {
-	repo  *repository.PietanzaRepository
-	cache *cache.PietanzaCache
+	repo             *repository.PietanzaRepository
+	cache            *cache.PietanzaCache
+	ricettaRepo      *repository.RicettaRepository
+	menuRepo         *repository.MenuFissoRepository
+	ingredienteCache *cache.IngredienteCache
 }
 
 // NewPietanzaHandler crea un nuovo handler per le pietanze
-func NewPietanzaHandler(repo *repository.PietanzaRepository, cache *cache.PietanzaCache) *PietanzaHandler {
+func NewPietanzaHandler(
+	repo *repository.PietanzaRepository,
+	cache *cache.PietanzaCache,
+	ricettaRepo *repository.RicettaRepository,
+	menuRepo *repository.MenuFissoRepository,
+	ingredienteCache *cache.IngredienteCache,
+) *PietanzaHandler {
 	return &PietanzaHandler{
-		repo:  repo,
-		cache: cache,
+		repo:             repo,
+		cache:            cache,
+		ricettaRepo:      ricettaRepo,
+		menuRepo:         menuRepo,
+		ingredienteCache: ingredienteCache,
 	}
 }
 
@@ -263,13 +276,76 @@ func (h *PietanzaHandler) AddPietanzaToOrdine(w http.ResponseWriter, r *http.Req
 	}
 
 	// Aggiungi la pietanza all'ordine
-	err = h.repo.AddPietanzaToOrdine(ctx, idOrdine, requestBody.IDPietanza, requestBody.Quantita)
+	err = h.repo.AddPietanzaToOrdine(ctx, idOrdine, requestBody.IDPietanza, requestBody.Quantita, h.ricettaRepo, h.ingredienteCache)
 	if err != nil {
-		http.Error(w, "Errore nell'aggiunta della pietanza all'ordine", http.StatusInternalServerError)
-		log.Printf("Errore nell'aggiunta della pietanza all'ordine: %v", err)
+		switch err {
+		case repository.ErrPietanzaNonDisponibile:
+			http.Error(w, "La pietanza non è disponibile", http.StatusBadRequest)
+		case repository.ErrIngredientiInsufficienti:
+			http.Error(w, "Ingredienti insufficienti per preparare la pietanza", http.StatusBadRequest)
+		default:
+			http.Error(w, "Errore nell'aggiunta della pietanza all'ordine", http.StatusInternalServerError)
+			log.Printf("Errore nell'aggiunta della pietanza all'ordine: %v", err)
+		}
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Pietanza aggiunta all'ordine con successo"})
+}
+
+// AddMenuFissoToOrdine aggiunge un menu fisso a un ordine
+func (h *PietanzaHandler) AddMenuFissoToOrdine(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	idOrdineStr := chi.URLParam(r, "id_ordine")
+	idOrdine, err := strconv.Atoi(idOrdineStr)
+	if err != nil {
+		http.Error(w, "ID ordine non valido", http.StatusBadRequest)
+		return
+	}
+
+	// Struttura per la richiesta
+	var requestBody struct {
+		IDMenu int `json:"id_menu"`
+	}
+
+	// Decodifica il JSON della richiesta
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		http.Error(w, "Formato JSON non valido", http.StatusBadRequest)
+		log.Printf("Errore nella decodifica JSON: %v", err)
+		return
+	}
+
+	// Validazione base
+	if requestBody.IDMenu <= 0 {
+		http.Error(w, "ID menu deve essere maggiore di zero", http.StatusBadRequest)
+		return
+	}
+
+	// Verificare che il menu esista
+	menuFisso, err := h.menuRepo.GetByID(ctx, requestBody.IDMenu)
+	if err != nil {
+		http.Error(w, "Menu fisso non trovato", http.StatusNotFound)
+		return
+	}
+
+	// Aggiungi il menu all'ordine
+	err = h.repo.AddMenuFissoToOrdine(ctx, idOrdine, requestBody.IDMenu, h.ricettaRepo, h.menuRepo, h.ingredienteCache)
+	if err != nil {
+		switch err {
+		case repository.ErrMenuNonDisponibile:
+			http.Error(w, "Il menu fisso non è disponibile: una o più pietanze non sono disponibili o mancano ingredienti", http.StatusBadRequest)
+		default:
+			http.Error(w, "Errore nell'aggiunta del menu fisso all'ordine", http.StatusInternalServerError)
+			log.Printf("Errore nell'aggiunta del menu fisso all'ordine: %v", err)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"message":   "Menu fisso aggiunto all'ordine con successo",
+		"nome_menu": menuFisso.Nome,
+		"prezzo":    fmt.Sprintf("%.2f", menuFisso.Prezzo),
+	})
 }
