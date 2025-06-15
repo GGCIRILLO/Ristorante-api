@@ -192,3 +192,51 @@ func (r *RicettaRepository) AggiornaIngredienti(ctx context.Context, tx pgx.Tx, 
 
 	return nil
 }
+
+// GetRicettaCompletaByPietanzaID restituisce la ricetta completa con ingredienti per una pietanza
+func (r *RicettaRepository) GetRicettaCompletaByPietanzaID(ctx context.Context, idPietanza int) (*models.RicettaCompleta, error) {
+	// 1. Recupera la ricetta di base
+	ricetta, err := r.GetByPietanzaID(ctx, idPietanza)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Recupera gli ingredienti associati alla ricetta
+	rows, err := r.DB.Query(ctx, `
+		SELECT ri.id_ricetta, ri.id_ingrediente, ri.quantita, 
+			i.id_ingrediente, i.nome, i.quantita_disponibile, i.unita_misura, i.soglia_riordino
+		FROM ricetta_ingrediente ri
+		JOIN ingrediente i ON ri.id_ingrediente = i.id_ingrediente
+		WHERE ri.id_ricetta = $1
+	`, ricetta.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ingredienti []models.IngredienteConQuantita
+	for rows.Next() {
+		var ing models.IngredienteConQuantita
+		var idRicetta, idIngrediente int
+		err := rows.Scan(
+			&idRicetta, &idIngrediente, &ing.Quantita,
+			&ing.Ingrediente.ID, &ing.Ingrediente.Nome, &ing.Ingrediente.QuantitaDisponibile,
+			&ing.Ingrediente.UnitaMisura, &ing.Ingrediente.SogliaRiordino,
+		)
+		if err != nil {
+			return nil, err
+		}
+		ingredienti = append(ingredienti, ing)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	ricettaCompleta := &models.RicettaCompleta{
+		Ricetta:     *ricetta,
+		Ingredienti: ingredienti,
+	}
+
+	return ricettaCompleta, nil
+}

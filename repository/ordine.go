@@ -29,7 +29,7 @@ func (r *OrdineRepository) Create(ctx context.Context, o *models.Ordine) error {
 
 // GetAll restituisce tutti gli ordini - utile per il Cuoco
 func (r *OrdineRepository) GetAll(ctx context.Context) ([]models.Ordine, error) {
-	rows, err := r.DB.Query(ctx, `SELECT id_ordine, id_tavolo, num_persone, data_ordine, stato, id_ristorante, costo_totale FROM ordine`)
+	rows, err := r.DB.Query(ctx, `SELECT id_ordine, id_tavolo, num_persone, data_ordine, stato, id_ristorante, costo_totale FROM ordine WHERE stato != 'pagato'  AND stato !='consegnato' ORDER BY data_ordine ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -279,4 +279,26 @@ func (r *OrdineRepository) GetOrdineCompleto(ctx context.Context, id int) (*mode
 	}
 
 	return ordineCompleto, nil
+}
+
+// GetAllOrdiniCompleti recupera tutti gli ordini con i dettagli completi
+func (r *OrdineRepository) GetAllOrdiniCompleti(ctx context.Context) ([]*models.OrdineCompleto, error) {
+	// 1. Recupera tutti gli ordini base
+	ordini, err := r.GetAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var ordiniCompleti []*models.OrdineCompleto
+
+	// 2. Per ogni ordine, recupera i dettagli completi
+	for _, ordine := range ordini {
+		ordineCompleto, err := r.GetOrdineCompleto(ctx, ordine.ID)
+		if err != nil {
+			return nil, err
+		}
+		ordiniCompleti = append(ordiniCompleti, ordineCompleto)
+	}
+
+	return ordiniCompleti, nil
 }

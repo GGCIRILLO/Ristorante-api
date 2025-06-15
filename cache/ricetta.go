@@ -79,3 +79,38 @@ func (c *RicettaCache) InvalidateIngredientiByRicettaID(ctx context.Context, idR
 	key := fmt.Sprintf("ricetta:%d:ingredienti", idRicetta)
 	return c.redis.Del(ctx, key).Err()
 }
+
+// GetRicettaCompletaByPietanzaID recupera una ricetta completa dalla cache in base all'ID della pietanza
+func (c *RicettaCache) GetRicettaCompletaByPietanzaID(ctx context.Context, idPietanza int) (*models.RicettaCompleta, bool, error) {
+	key := fmt.Sprintf("ricetta:completa:pietanza:%d", idPietanza)
+	val, err := c.redis.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return nil, false, nil // cache miss
+	} else if err != nil {
+		return nil, false, err
+	}
+
+	var ricettaCompleta models.RicettaCompleta
+	if err := json.Unmarshal([]byte(val), &ricettaCompleta); err != nil {
+		return nil, false, err
+	}
+
+	return &ricettaCompleta, true, nil
+}
+
+// SetRicettaCompletaByPietanzaID salva una ricetta completa nella cache in base all'ID della pietanza
+func (c *RicettaCache) SetRicettaCompletaByPietanzaID(ctx context.Context, idPietanza int, ricetta *models.RicettaCompleta) error {
+	key := fmt.Sprintf("ricetta:completa:pietanza:%d", idPietanza)
+	val, err := json.Marshal(ricetta)
+	if err != nil {
+		return err
+	}
+
+	return c.redis.Set(ctx, key, val, 30*time.Minute).Err()
+}
+
+// InvalidateRicettaCompletaByPietanzaID invalida la cache della ricetta completa per una pietanza specifica
+func (c *RicettaCache) InvalidateRicettaCompletaByPietanzaID(ctx context.Context, idPietanza int) error {
+	key := fmt.Sprintf("ricetta:completa:pietanza:%d", idPietanza)
+	return c.redis.Del(ctx, key).Err()
+}

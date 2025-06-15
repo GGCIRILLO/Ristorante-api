@@ -169,3 +169,29 @@ func (h *OrdineHandler) CalcolaScontrino(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(scontrino)
 }
+
+// GetAllOrdiniCompleti recupera tutti gli ordini con i dettagli completi (pietanze e menu)
+func (h *OrdineHandler) GetAllOrdiniCompleti(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Tenta di recuperare dalla cache
+	ordiniCompleti, err := h.Cache.GetAllOrdiniCompleti(ctx)
+	if err != nil || ordiniCompleti == nil {
+		// Cache miss o errore, recupera dal database
+		ordiniCompleti, err = h.Repo.GetAllOrdiniCompleti(ctx)
+		if err != nil {
+			http.Error(w, "Errore nel recupero degli ordini completi", http.StatusInternalServerError)
+			log.Printf("Errore nel recupero degli ordini completi: %v", err)
+			return
+		}
+
+		// Salva in cache per le future richieste
+		if err := h.Cache.SetAllOrdiniCompleti(ctx, ordiniCompleti); err != nil {
+			log.Printf("Errore nell'aggiornamento della cache per ordini completi: %v", err)
+			// Continua comunque
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(ordiniCompleti)
+}

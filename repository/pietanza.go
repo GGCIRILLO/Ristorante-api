@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"errors"
-	"fmt"
 	"ristorante-api/cache"
 	"ristorante-api/models"
 
@@ -114,8 +113,6 @@ func (r *PietanzaRepository) AddPietanzaToOrdine(ctx context.Context, idOrdine i
 	// Rollback in caso di errore
 	defer tx.Rollback(ctx)
 
-	fmt.Println("Aggiunta pietanza all'ordine:", idOrdine, "Pietanza:", idPietanza, "Quantità:", quantita)
-
 	// 1. Verifica che la pietanza sia disponibile
 	var disponibile bool
 	err = tx.QueryRow(ctx, `
@@ -123,8 +120,6 @@ func (r *PietanzaRepository) AddPietanzaToOrdine(ctx context.Context, idOrdine i
 		FROM pietanza
 		WHERE id_pietanza = $1
 	`, idPietanza).Scan(&disponibile)
-
-	fmt.Println("Verifica disponibilità pietanza:", idPietanza, "Disponibile:", disponibile)
 
 	if err != nil {
 		return err
@@ -140,8 +135,6 @@ func (r *PietanzaRepository) AddPietanzaToOrdine(ctx context.Context, idOrdine i
 		return err
 	}
 
-	fmt.Println("Ricetta trovata per la pietanza:", idPietanza, "ID Ricetta:", ricetta.ID)
-
 	// 3. Verifica la disponibilità degli ingredienti utilizzando la cache
 	disponibilitaIngredienti, ingredientiNecessari, err := ricettaRepo.VerificaDisponibilitaIngredienti(ctx, ricetta.ID, quantita, ingredienteCache)
 	if err != nil {
@@ -155,12 +148,10 @@ func (r *PietanzaRepository) AddPietanzaToOrdine(ctx context.Context, idOrdine i
 	// 4. Aggiunge la pietanza all'ordine
 	_, err = tx.Exec(ctx, `
 		INSERT INTO dettaglio_ordine_pietanza (id_ordine, id_pietanza, quantita, parte_di_menu, id_menu)
-		VALUES ($1, $2, $3, false, NULL)
+		VALUES ($1, $2, $3, false, 0)
 		ON CONFLICT (id_ordine, id_pietanza, parte_di_menu, id_menu)
 		DO UPDATE SET quantita = dettaglio_ordine_pietanza.quantita + EXCLUDED.quantita
 	`, idOrdine, idPietanza, quantita)
-
-	fmt.Println("Aggiunta pietanza all'ordine OK:", idOrdine, "Pietanza:", idPietanza, "Quantità:", quantita)
 
 	if err != nil {
 		return err
@@ -172,16 +163,12 @@ func (r *PietanzaRepository) AddPietanzaToOrdine(ctx context.Context, idOrdine i
 		return err
 	}
 
-	fmt.Println("Ingredienti aggiornati per la pietanza:", idPietanza)
-
 	// 6. Aggiorna il costo totale dell'ordine
 	ordineRepo := OrdineRepository{DB: r.DB}
 	err = ordineRepo.AggiornaCostoTotale(ctx, tx, idOrdine, nil)
 	if err != nil {
 		return err
 	}
-
-	fmt.Println("Costo totale dell'ordine aggiornato:", idOrdine)
 
 	// Commit della transazione
 	return tx.Commit(ctx)

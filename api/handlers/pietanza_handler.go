@@ -349,3 +349,55 @@ func (h *PietanzaHandler) AddMenuFissoToOrdine(w http.ResponseWriter, r *http.Re
 		"prezzo":    fmt.Sprintf("%.2f", menuFisso.Prezzo),
 	})
 }
+
+// GetRicettaByPietanzaID restituisce la ricetta completa con ingredienti di una pietanza
+func (h *PietanzaHandler) GetRicettaByPietanzaID(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "ID pietanza non valido", http.StatusBadRequest)
+		return
+	}
+
+	// Verifica che la pietanza esista
+	exists, err := h.repo.Exists(ctx, id)
+	if err != nil {
+		http.Error(w, "Errore nella verifica della pietanza", http.StatusInternalServerError)
+		log.Printf("Errore nella verifica della pietanza: %v", err)
+		return
+	}
+	if !exists {
+		http.Error(w, "Pietanza non trovata", http.StatusNotFound)
+		return
+	}
+
+	// Tenta di recuperare la ricetta completa dalla cache
+	ricettaCompleta, found, err := h.ricettaRepo.Cache.GetRicettaCompletaByPietanzaID(ctx, id)
+	if err != nil {
+		log.Printf("Errore nell'accesso alla cache della ricetta: %v", err)
+		// Continua con il database in caso di errore della cache
+	} else if found {
+		// Usa i dati dalla cache
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(ricettaCompleta)
+		return
+	}
+
+	// Cache miss o errore, recupera dal database
+	ricettaCompleta, err = h.ricettaRepo.GetRicettaCompletaByPietanzaID(ctx, id)
+	if err != nil {
+		http.Error(w, "Ricetta non trovata per questa pietanza", http.StatusNotFound)
+		log.Printf("Errore nel recupero della ricetta: %v", err)
+		return
+	}
+
+	// Salva in cache per le future richieste
+	if err := h.ricettaRepo.Cache.SetRicettaCompletaByPietanzaID(ctx, id, ricettaCompleta); err != nil {
+		log.Printf("Errore nell'aggiornamento della cache della ricetta: %v", err)
+		// Continua comunque
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(ricettaCompleta)
+}

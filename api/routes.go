@@ -82,6 +82,7 @@ func SetupRoutes(db *database.DB) *chi.Mux {
 
 		r.Route("/ordini", func(r chi.Router) {
 			r.Get("/", ordineHandler.GetOrdini)
+			r.Get("/completi", ordineHandler.GetAllOrdiniCompleti)
 			r.Get("/{id}", ordineHandler.GetOrdine)
 			r.Get("/{id}/completo", ordineHandler.GetOrdineCompleto)
 			r.Post("/", ordineHandler.CreateOrdine)
@@ -93,6 +94,7 @@ func SetupRoutes(db *database.DB) *chi.Mux {
 		r.Route("/pietanze", func(r chi.Router) {
 			r.Get("/", pietanzaHandler.GetPietanze)
 			r.Get("/{id}", pietanzaHandler.GetPietanza)
+			r.Get("/{id}/ricetta", pietanzaHandler.GetRicettaByPietanzaID)
 			r.Post("/", pietanzaHandler.CreatePietanza)
 			r.Put("/{id}", pietanzaHandler.UpdatePietanza)
 			r.Delete("/{id}", pietanzaHandler.DeletePietanza)
