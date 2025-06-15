@@ -28,4 +28,4 @@ RUN go install github.com/githubnemo/CompileDaemon@latest
 # Espone la porta
 EXPOSE 8080
 
-CMD ["CompileDaemon", "--build=go build -o main .", "--command=./main"]
+CMD ["CompileDaemon", "--build=go build -buildvcs=false -o main .", "--command=./main"]

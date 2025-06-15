@@ -198,12 +198,11 @@ func (db *DB) InitSchema() error {
 	// Tabella Composizione Menu Fisso
 	_, err = db.Pool.Exec(context.Background(), `
 		CREATE TABLE IF NOT EXISTS composizione_menu_fisso (
-		  id_menu INTEGER NOT NULL,
-		  id_pietanza INTEGER NOT NULL,
-		  PRIMARY KEY (id_menu, id_pietanza),
-		  FOREIGN KEY (id_menu) REFERENCES menu_fisso (id_menu) ON DELETE CASCADE,
-		  FOREIGN KEY (id_pietanza) REFERENCES pietanza (id_pietanza) ON DELETE CASCADE
-		  UNIQUE (id_menu, id_pietanza)
+		id_menu INTEGER NOT NULL,
+		id_pietanza INTEGER NOT NULL,
+		PRIMARY KEY (id_menu, id_pietanza),
+		FOREIGN KEY (id_menu) REFERENCES menu_fisso (id_menu) ON DELETE CASCADE,
+		FOREIGN KEY (id_pietanza) REFERENCES pietanza (id_pietanza) ON DELETE CASCADE
 		)
 	`)
 	if err != nil {
