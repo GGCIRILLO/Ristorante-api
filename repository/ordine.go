@@ -94,19 +94,24 @@ func (r *OrdineRepository) AggiornaCostoTotale(ctx context.Context, tx pgx.Tx, i
 		return err
 	}
 
-	// Altrimenti ricalcola il totale dalle pietanze dell'ordine (escluse quelle nei menu fissi)
+	// Altrimenti ricalcola il totale dalle pietanze dell'ordine
 	_, err := tx.Exec(ctx, `
 		UPDATE ordine o
 		SET costo_totale = (
+			-- Pietanze normali (non parte di menu fisso)
 			SELECT COALESCE(SUM(p.prezzo * d.quantita), 0)
 			FROM dettaglio_ordine_pietanza d
 			JOIN pietanza p ON d.id_pietanza = p.id_pietanza
 			WHERE d.id_ordine = o.id_ordine AND (d.parte_di_menu = false OR d.parte_di_menu IS NULL)
 		) + (
+			-- Menu fissi (calcolati dai loro ID distinti)
 			SELECT COALESCE(SUM(m.prezzo), 0)
-			FROM dettaglio_ordine_menu d
-			JOIN menu_fisso m ON d.id_menu = m.id_menu
-			WHERE d.id_ordine = o.id_ordine
+			FROM (
+				SELECT DISTINCT id_menu 
+				FROM dettaglio_ordine_pietanza 
+				WHERE id_ordine = o.id_ordine AND parte_di_menu = true AND id_menu IS NOT NULL
+			) AS menu_ids
+			JOIN menu_fisso m ON menu_ids.id_menu = m.id_menu
 		)
 		WHERE o.id_ordine = $1
 	`, idOrdine)
@@ -187,4 +192,91 @@ func (r *OrdineRepository) CalcolaScontrino(ctx context.Context, idTavolo int) (
 	}
 
 	return scontrino, nil
+}
+
+// GetOrdineCompleto recupera un ordine per ID inclusi tutti i dettagli
+// delle pietanze e dei menu fissi associati
+func (r *OrdineRepository) GetOrdineCompleto(ctx context.Context, id int) (*models.OrdineCompleto, error) {
+	// 1. Recupera l'ordine base
+	ordine, err := r.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Recupera tutte le pietanze dell'ordine con i dettagli
+	rows, err := r.DB.Query(ctx, `
+		SELECT 
+			d.id_dettaglio, d.id_ordine, d.id_pietanza, d.quantita, 
+			d.parte_di_menu, d.id_menu,
+			p.id_pietanza, p.nome, p.prezzo, p.id_categoria, p.disponibile
+		FROM dettaglio_ordine_pietanza d
+		JOIN pietanza p ON d.id_pietanza = p.id_pietanza
+		WHERE d.id_ordine = $1
+		ORDER BY d.id_menu NULLS FIRST, d.id_dettaglio
+	`, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var dettagliPietanze []models.DettaglioPietanza
+	menuMap := make(map[int][]models.DettaglioPietanza)
+
+	for rows.Next() {
+		var dettaglio models.DettaglioPietanza
+		var idMenu *int
+		err := rows.Scan(
+			&dettaglio.ID, &dettaglio.IDOrdine, &dettaglio.Pietanza.ID, &dettaglio.Quantita,
+			&dettaglio.ParteDiMenu, &idMenu,
+			&dettaglio.Pietanza.ID, &dettaglio.Pietanza.Nome, &dettaglio.Pietanza.Prezzo,
+			&dettaglio.Pietanza.IDCategoria, &dettaglio.Pietanza.Disponibile,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		dettaglio.IDMenu = idMenu
+
+		// Se è parte di un menu, aggiungilo alla mappa dei menu
+		if dettaglio.ParteDiMenu && idMenu != nil {
+			menuMap[*idMenu] = append(menuMap[*idMenu], dettaglio)
+		} else {
+			// Altrimenti aggiungilo come pietanza indipendente
+			dettagliPietanze = append(dettagliPietanze, dettaglio)
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// 3. Per ogni menu trovato, recupera i dettagli del menu fisso
+	var dettagliMenuFissi []models.DettaglioMenuFisso
+	for idMenu, pietanzeMenu := range menuMap {
+		// Recupera i dettagli del menu fisso
+		var menu models.MenuFisso
+		err := r.DB.QueryRow(ctx, `
+			SELECT id_menu, nome, prezzo, descrizione
+			FROM menu_fisso
+			WHERE id_menu = $1
+		`, idMenu).Scan(&menu.ID, &menu.Nome, &menu.Prezzo, &menu.Descrizione)
+		if err != nil {
+			return nil, err
+		}
+
+		dettaglioMenu := models.DettaglioMenuFisso{
+			Menu:     menu,
+			Pietanze: pietanzeMenu,
+		}
+		dettagliMenuFissi = append(dettagliMenuFissi, dettaglioMenu)
+	}
+
+	// 4. Componi l'ordine completo
+	ordineCompleto := &models.OrdineCompleto{
+		Ordine:    ordine,
+		Pietanze:  dettagliPietanze,
+		MenuFissi: dettagliMenuFissi,
+	}
+
+	return ordineCompleto, nil
 }

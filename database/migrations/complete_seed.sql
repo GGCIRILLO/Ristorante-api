@@ -596,7 +596,7 @@ INSERT INTO menu_fisso (nome, prezzo, descrizione) VALUES
 ('Menu Bambini', 15.0, 'Piatti semplici adatti ai piu piccoli');
 
 -- Dati generati per la tabella composizione_menu
-INSERT INTO composizione_menu_fisso (id_menu, id_pietanza) VALUES
+INSERT INTO composizione_menu (id_menu, id_pietanza) VALUES
 (1, 1),
 (1, 11),
 (1, 21),

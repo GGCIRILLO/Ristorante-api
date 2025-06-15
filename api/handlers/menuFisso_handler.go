@@ -376,3 +376,79 @@ func (h *MenuFissoHandler) RemovePietanzaFromMenu(w http.ResponseWriter, r *http
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Pietanza rimossa dal menu con successo"})
 }
+
+// GetMenuFissoCompleto restituisce un menu fisso con tutte le pietanze che lo compongono
+func (h *MenuFissoHandler) GetMenuFissoCompleto(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "ID non valido", http.StatusBadRequest)
+		return
+	}
+
+	// Tenta di recuperare il menu fisso completo dalla cache
+	menuCompleto, found, err := h.cache.GetMenuFissoCompleto(ctx, id)
+	if err != nil {
+		log.Printf("Errore nell'accesso alla cache: %v", err)
+		// Continua con il database in caso di errore della cache
+	} else if found {
+		// Usa i dati dalla cache
+		log.Printf("Servendo il menu fisso completo ID %d dalla cache Redis", id)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(menuCompleto)
+		return
+	}
+
+	// Cache miss o errore, recupera dal database
+	menuCompleto, err = h.repo.GetMenuFissoCompleto(ctx, id)
+	if err != nil {
+		http.Error(w, "Menu fisso non trovato", http.StatusNotFound)
+		log.Printf("Errore nel recupero del menu fisso completo: %v", err)
+		return
+	}
+
+	// Salva in cache per le future richieste
+	if err := h.cache.SetMenuFissoCompleto(ctx, id, menuCompleto); err != nil {
+		log.Printf("Errore nell'aggiornamento della cache: %v", err)
+		// Continua comunque
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(menuCompleto)
+}
+
+// GetAllMenuFissiCompleti restituisce tutti i menu fissi con i dettagli delle pietanze
+func (h *MenuFissoHandler) GetAllMenuFissiCompleti(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Tenta di recuperare tutti i menu fissi completi dalla cache
+	// menuCompleti, found, err := h.cache.GetAllMenuFissiCompleti(ctx)
+	// if err != nil {
+	// 	log.Printf("Errore nell'accesso alla cache: %v", err)
+	// 	// Continua con il database in caso di errore della cache
+	// } else if found {
+	// 	// Usa i dati dalla cache
+	// 	log.Printf("Servendo tutti i menu fissi completi dalla cache Redis")
+	// 	w.Header().Set("Content-Type", "application/json")
+	// 	json.NewEncoder(w).Encode(menuCompleti)
+	// 	return
+	// }
+
+	// Cache miss o errore, recupera dal database
+	menuCompleti, err := h.repo.GetAllMenuFissiCompleti(ctx)
+	if err != nil {
+		http.Error(w, "Errore nel recupero dei menu fissi", http.StatusInternalServerError)
+		log.Printf("Errore nel recupero dei menu fissi completi: %v", err)
+		return
+	}
+
+	// Salva in cache per le future richieste
+	if err := h.cache.SetAllMenuFissiCompleti(ctx, menuCompleti); err != nil {
+		log.Printf("Errore nell'aggiornamento della cache: %v", err)
+		// Continua comunque
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(menuCompleti)
+}

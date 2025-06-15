@@ -104,3 +104,61 @@ func (c *MenuFissoCache) SetComposizione(ctx context.Context, idMenu int, pietan
 func (c *MenuFissoCache) InvalidateComposizione(ctx context.Context, idMenu int) error {
 	return c.redis.Del(ctx, fmt.Sprintf("menu_fisso:%d:composizione", idMenu)).Err()
 }
+
+// GetMenuFissoCompleto recupera un menu fisso completo dalla cache
+func (c *MenuFissoCache) GetMenuFissoCompleto(ctx context.Context, id int) (*models.MenuFissoCompleto, bool, error) {
+	key := fmt.Sprintf("menu_fisso:completo:%d", id)
+	val, err := c.redis.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return nil, false, nil // cache miss
+	} else if err != nil {
+		return nil, false, err
+	}
+
+	var menuCompleto models.MenuFissoCompleto
+	if err := json.Unmarshal([]byte(val), &menuCompleto); err != nil {
+		return nil, false, err
+	}
+
+	return &menuCompleto, true, nil
+}
+
+// SetMenuFissoCompleto salva un menu fisso completo nella cache
+func (c *MenuFissoCache) SetMenuFissoCompleto(ctx context.Context, id int, menuCompleto *models.MenuFissoCompleto) error {
+	key := fmt.Sprintf("menu_fisso:completo:%d", id)
+	val, err := json.Marshal(menuCompleto)
+	if err != nil {
+		return err
+	}
+
+	return c.redis.Set(ctx, key, val, 30*time.Minute).Err()
+}
+
+// GetAllMenuFissiCompleti recupera tutti i menu fissi completi dalla cache
+func (c *MenuFissoCache) GetAllMenuFissiCompleti(ctx context.Context) ([]models.MenuFissoCompleto, bool, error) {
+	key := "menu_fissi:completi:all"
+	val, err := c.redis.Get(ctx, key).Result()
+	if err == redis.Nil {
+		return nil, false, nil // cache miss
+	} else if err != nil {
+		return nil, false, err
+	}
+
+	var menuCompleti []models.MenuFissoCompleto
+	if err := json.Unmarshal([]byte(val), &menuCompleti); err != nil {
+		return nil, false, err
+	}
+
+	return menuCompleti, true, nil
+}
+
+// SetAllMenuFissiCompleti salva tutti i menu fissi completi nella cache
+func (c *MenuFissoCache) SetAllMenuFissiCompleti(ctx context.Context, menuCompleti []models.MenuFissoCompleto) error {
+	key := "menu_fissi:completi:all"
+	val, err := json.Marshal(menuCompleti)
+	if err != nil {
+		return err
+	}
+
+	return c.redis.Set(ctx, key, val, 30*time.Minute).Err()
+}

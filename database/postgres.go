@@ -197,7 +197,7 @@ func (db *DB) InitSchema() error {
 
 	// Tabella Composizione Menu Fisso
 	_, err = db.Pool.Exec(context.Background(), `
-		CREATE TABLE IF NOT EXISTS composizione_menu_fisso (
+		CREATE TABLE IF NOT EXISTS composizione_menu (
 		id_menu INTEGER NOT NULL,
 		id_pietanza INTEGER NOT NULL,
 		PRIMARY KEY (id_menu, id_pietanza),
@@ -206,7 +206,7 @@ func (db *DB) InitSchema() error {
 		)
 	`)
 	if err != nil {
-		return fmt.Errorf("failed to create composizione_menu_fisso table: %v", err)
+		return fmt.Errorf("failed to create composizione_menu table: %v", err)
 	}
 
 	// Tabella Ordine

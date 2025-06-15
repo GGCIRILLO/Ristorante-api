@@ -153,6 +153,28 @@ func (h *TavoloHandler) CambiaStatoTavolo(w http.ResponseWriter, r *http.Request
 		return
 	}
 	_ = h.Cache.InvalidateTavoli(ctx)
+	_ = h.Cache.InvalidateTavoliLiberi(ctx)
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(t)
+}
+
+// GetTavoliLiberi restituisce i tavoli liberi per un ristorante specifico
+func (h *TavoloHandler) GetTavoliLiberi(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	tavoli, err := h.Cache.GetTavoliLiberi(ctx)
+	if err != nil {
+		log.Printf("Errore cache GetTavoliLiberi: %v", err)
+	}
+	if tavoli == nil {
+		tavoli, err = h.Repo.GetTavoliLiberi(ctx, 1) // Supponiamo ID ristorante 1
+		if err != nil {
+			http.Error(w, "Errore recupero tavoli liberi", http.StatusInternalServerError)
+			return
+		}
+		_ = h.Cache.SetTavoliLiberi(ctx, tavoli)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tavoli)
 }

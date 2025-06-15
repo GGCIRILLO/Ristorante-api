@@ -77,11 +77,13 @@ func SetupRoutes(db *database.DB) *chi.Mux {
 			r.Put("/{id}", tavoloHandler.UpdateTavolo)
 			r.Delete("/{id}", tavoloHandler.DeleteTavolo)
 			r.Patch("/{id}/stato", tavoloHandler.CambiaStatoTavolo)
+			r.Get("/liberi", tavoloHandler.GetTavoliLiberi)
 		})
 
 		r.Route("/ordini", func(r chi.Router) {
 			r.Get("/", ordineHandler.GetOrdini)
 			r.Get("/{id}", ordineHandler.GetOrdine)
+			r.Get("/{id}/completo", ordineHandler.GetOrdineCompleto)
 			r.Post("/", ordineHandler.CreateOrdine)
 			r.Patch("/{id}", ordineHandler.UpdateStatoOrdine)
 			r.Delete("/{id}", ordineHandler.DeleteOrdine)
@@ -100,11 +102,13 @@ func SetupRoutes(db *database.DB) *chi.Mux {
 
 		r.Route("/menu-fissi", func(r chi.Router) {
 			r.Get("/", menuFissoHandler.GetMenuFissi)
+			r.Get("/completi", menuFissoHandler.GetAllMenuFissiCompleti)
 			r.Get("/{id}", menuFissoHandler.GetMenuFisso)
 			r.Post("/", menuFissoHandler.CreateMenuFisso)
 			r.Put("/{id}", menuFissoHandler.UpdateMenuFisso)
 			r.Delete("/{id}", menuFissoHandler.DeleteMenuFisso)
 			r.Get("/{id}/composizione", menuFissoHandler.GetComposizione)
+			r.Get("/{id}/completo", menuFissoHandler.GetMenuFissoCompleto)
 			r.Post("/{id}/pietanza", menuFissoHandler.AddPietanzaToMenu)
 			r.Delete("/{id}/pietanza/{id_pietanza}", menuFissoHandler.RemovePietanzaFromMenu)
 		})

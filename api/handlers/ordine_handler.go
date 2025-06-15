@@ -45,6 +45,8 @@ func (h *OrdineHandler) GetOrdine(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "ID non valido", http.StatusBadRequest)
 		return
 	}
+
+	// Altrimenti recupera l'ordine base
 	ordine, err := h.Repo.GetByID(ctx, id)
 	if err != nil {
 		http.Error(w, "Ordine non trovato", http.StatusNotFound)
@@ -53,6 +55,27 @@ func (h *OrdineHandler) GetOrdine(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(ordine)
+}
+
+// GetOrdineCompleto recupera un ordine con tutti i suoi dettagli (pietanze e menu)
+func (h *OrdineHandler) GetOrdineCompleto(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "ID non valido", http.StatusBadRequest)
+		return
+	}
+
+	ordineCompleto, err := h.Repo.GetOrdineCompleto(ctx, id)
+	if err != nil {
+		http.Error(w, "Ordine non trovato", http.StatusNotFound)
+		log.Printf("Errore nel recupero ordine completo: %v", err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(ordineCompleto)
 }
 
 func (h *OrdineHandler) CreateOrdine(w http.ResponseWriter, r *http.Request) {

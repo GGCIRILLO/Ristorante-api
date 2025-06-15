@@ -52,3 +52,35 @@ func (c *TavoloCache) SetTavoli(ctx context.Context, tavoli []models.Tavolo) err
 func (c *TavoloCache) InvalidateTavoli(ctx context.Context) error {
 	return c.redis.Del(ctx, tavoliKey).Err()
 }
+
+// get tavoli liberi
+func (c *TavoloCache) GetTavoliLiberi(ctx context.Context) ([]models.Tavolo, error) {
+	data, err := c.redis.Get(ctx, "ristorante:1:tavoli:liberi").Result()
+	if err == redis.Nil {
+		return nil, nil // cache miss
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var tavoli []models.Tavolo
+	if err := json.Unmarshal([]byte(data), &tavoli); err != nil {
+		return nil, err
+	}
+	return tavoli, nil
+}
+
+// SetTavoliLiberi salva i tavoli liberi in cache
+func (c *TavoloCache) SetTavoliLiberi(ctx context.Context, tavoli []models.Tavolo) error {
+	data, err := json.Marshal(tavoli)
+	if err != nil {
+		return err
+	}
+
+	return c.redis.Set(ctx, "ristorante:1:tavoli:liberi", data, 5*time.Minute).Err()
+}
+
+// InvalidateTavoliLiberi cancella la cache dei tavoli liberi
+func (c *TavoloCache) InvalidateTavoliLiberi(ctx context.Context) error {
+	return c.redis.Del(ctx, "ristorante:1:tavoli:liberi").Err()
+}

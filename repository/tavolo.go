@@ -44,6 +44,29 @@ func (r *TavoloRepository) GetByID(ctx context.Context, id int) (models.Tavolo, 
 	return t, nil
 }
 
+// Get tavoli liberi
+func (r *TavoloRepository) GetTavoliLiberi(ctx context.Context, idRistorante int) ([]models.Tavolo, error) {
+	rows, err := r.DB.Query(ctx, `
+		SELECT id_tavolo, max_posti, stato, id_ristorante
+		FROM tavolo
+		WHERE id_ristorante = $1 AND stato = 'libero'
+		ORDER BY id_tavolo`, idRistorante)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tavoli []models.Tavolo
+	for rows.Next() {
+		var t models.Tavolo
+		if err := rows.Scan(&t.ID, &t.MaxPosti, &t.Stato, &t.IDRistorante); err != nil {
+			return nil, err
+		}
+		tavoli = append(tavoli, t)
+	}
+	return tavoli, nil
+}
+
 // CambiaStato cambia lo stato di un tavolo
 func (r *TavoloRepository) CambiaStato(ctx context.Context, id int, nuovoStato string) (models.Tavolo, error) {
 	var t models.Tavolo

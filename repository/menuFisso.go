@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"ristorante-api/models"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -97,7 +98,7 @@ func (r *MenuFissoRepository) GetComposizione(ctx context.Context, idMenu int) (
 	rows, err := r.DB.Query(ctx, `
 		SELECT p.id_pietanza, p.nome, p.prezzo, p.id_categoria, p.disponibile
 		FROM pietanza p
-		JOIN composizione_menu_fisso c ON p.id_pietanza = c.id_pietanza
+		JOIN composizione_menu c ON p.id_pietanza = c.id_pietanza
 		WHERE c.id_menu = $1
 	`, idMenu)
 	if err != nil {
@@ -125,7 +126,7 @@ func (r *MenuFissoRepository) GetComposizione(ctx context.Context, idMenu int) (
 // AddPietanzaToMenu aggiunge una pietanza a un menu fisso
 func (r *MenuFissoRepository) AddPietanzaToMenu(ctx context.Context, idMenu int, idPietanza int) error {
 	_, err := r.DB.Exec(ctx, `
-		INSERT INTO composizione_menu_fisso (id_menu, id_pietanza)
+		INSERT INTO composizione_menu (id_menu, id_pietanza)
 		VALUES ($1, $2)
 		ON CONFLICT (id_menu, id_pietanza) DO NOTHING
 	`, idMenu, idPietanza)
@@ -135,8 +136,60 @@ func (r *MenuFissoRepository) AddPietanzaToMenu(ctx context.Context, idMenu int,
 // RemovePietanzaFromMenu rimuove una pietanza da un menu fisso
 func (r *MenuFissoRepository) RemovePietanzaFromMenu(ctx context.Context, idMenu int, idPietanza int) error {
 	_, err := r.DB.Exec(ctx, `
-		DELETE FROM composizione_menu_fisso
+		DELETE FROM composizione_menu
 		WHERE id_menu = $1 AND id_pietanza = $2
 	`, idMenu, idPietanza)
 	return err
+}
+
+// GetMenuFissoCompleto restituisce un menu fisso con tutte le pietanze che lo compongono
+func (r *MenuFissoRepository) GetMenuFissoCompleto(ctx context.Context, id int) (*models.MenuFissoCompleto, error) {
+	// 1. Recupera il menu fisso base
+	menuFisso, err := r.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Recupera tutte le pietanze associate al menu
+	pietanze, err := r.GetComposizione(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Componi il menu fisso completo
+	menuCompleto := &models.MenuFissoCompleto{
+		Menu:     *menuFisso,
+		Pietanze: pietanze,
+	}
+
+	return menuCompleto, nil
+}
+
+// GetAllMenuFissiCompleti restituisce tutti i menu fissi con i dettagli delle pietanze
+func (r *MenuFissoRepository) GetAllMenuFissiCompleti(ctx context.Context) ([]models.MenuFissoCompleto, error) {
+	// 1. Recupera tutti i menu fissi
+	menuFissi, err := r.GetAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Per ogni menu fisso, recupera le pietanze associate
+	var menuCompleti []models.MenuFissoCompleto
+	for _, menu := range menuFissi {
+		// Recupera le pietanze per questo menu
+		pietanze, err := r.GetComposizione(ctx, menu.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		fmt.Println("Menu Fisso:", menu.Nome, "ha", len(pietanze), "pietanze")
+
+		menuCompleto := models.MenuFissoCompleto{
+			Menu:     menu,
+			Pietanze: pietanze,
+		}
+		menuCompleti = append(menuCompleti, menuCompleto)
+	}
+
+	return menuCompleti, nil
 }
