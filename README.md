@@ -1,6 +1,6 @@
 # 🍽️ Ristorante API
 
-Sistema per la gestione di un ristorante, sviluppato in Go, con persistenza su PostgreSQL e caching Redis. Progetto realizzato come parte del corso di **Ingegneria del Software**. Api a servizio di (Gestione Ristorante)[https://github.com/GGCIRILLO/Ristorante-Frontend]. 
+Sistema per la gestione di un ristorante, sviluppato in Go, con persistenza su PostgreSQL e caching Redis. Progetto realizzato come parte del corso di **Ingegneria del Software**. Api a servizio di [Gestione Ristorante](https://github.com/GGCIRILLO/Ristorante-Frontend). 
 
 ## 📂 Struttura del Progetto
 
