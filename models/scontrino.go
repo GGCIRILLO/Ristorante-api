@@ -12,5 +12,4 @@ type Scontrino struct {
 	CostoCoperto      float64   `json:"costo_coperto"`
 	ImportoCoperto    float64   `json:"importo_coperto"`
 	TotaleComplessivo float64   `json:"totale_complessivo"`
-	DataPagamento     time.Time `json:"data_pagamento"`
 }

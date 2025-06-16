@@ -54,6 +54,9 @@ func SetupRoutes(db *database.DB) *chi.Mux {
 	// Pietanza Handler
 	pietanzaHandler := handlers.NewPietanzaHandler(pietanzaRepo, pietanzaCache, ricettaRepo, menuFissoRepo, ingredienteCache)
 
+	// Ingredienti
+	ingredienteRepo := repository.NewIngredienteRepository(db.Pool)
+	ingredienteHandler := handlers.NewIngredienteHandler(ingredienteRepo, ingredienteCache)
 	// Monitoring Routes
 	r.Route("/monitoring", func(r chi.Router) {
 		r.Get("/redis", monitoringHandler.GetRedisStatus)
@@ -78,6 +81,7 @@ func SetupRoutes(db *database.DB) *chi.Mux {
 			r.Delete("/{id}", tavoloHandler.DeleteTavolo)
 			r.Patch("/{id}/stato", tavoloHandler.CambiaStatoTavolo)
 			r.Get("/liberi", tavoloHandler.GetTavoliLiberi)
+			r.Get("/occupati", tavoloHandler.GetTavoliOccupati)
 		})
 
 		r.Route("/ordini", func(r chi.Router) {
@@ -113,6 +117,16 @@ func SetupRoutes(db *database.DB) *chi.Mux {
 			r.Get("/{id}/completo", menuFissoHandler.GetMenuFissoCompleto)
 			r.Post("/{id}/pietanza", menuFissoHandler.AddPietanzaToMenu)
 			r.Delete("/{id}/pietanza/{id_pietanza}", menuFissoHandler.RemovePietanzaFromMenu)
+		})
+
+		r.Route("/ingredienti", func(r chi.Router) {
+			r.Get("/", ingredienteHandler.GetIngredienti)
+			r.Get("/{id}", ingredienteHandler.GetIngredienteByID)
+			r.Post("/", ingredienteHandler.CreateIngrediente)
+			r.Put("/{id}", ingredienteHandler.UpdateIngrediente)
+			r.Delete("/{id}", ingredienteHandler.DeleteIngrediente)
+			r.Get("/da-riordinare", ingredienteHandler.GetIngredientiDaRiordinare)
+			r.Post("/{id}/rifornisci", ingredienteHandler.RifornisciIngrediente)
 		})
 
 	})

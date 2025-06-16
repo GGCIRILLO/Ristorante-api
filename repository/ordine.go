@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"ristorante-api/models"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -122,7 +121,7 @@ func (r *OrdineRepository) AggiornaCostoTotale(ctx context.Context, tx pgx.Tx, i
 // CalcolaScontrino calcola lo scontrino per l'ordine di un tavolo
 // Prende l'ordine in stato "consegnato" associato al tavolo
 // Aggiunge il costo del coperto per ogni persona al costo totale
-// Imposta lo stato dell'ordine come "pagato"
+// Non modifica lo stato dell'ordine (il pagamento verrà gestito separatamente)
 func (r *OrdineRepository) CalcolaScontrino(ctx context.Context, idTavolo int) (*models.Scontrino, error) {
 	// Inizia una transazione
 	tx, err := r.DB.Begin(ctx)
@@ -144,6 +143,14 @@ func (r *OrdineRepository) CalcolaScontrino(ctx context.Context, idTavolo int) (
 		&ordine.Stato, &ordine.IDRistorante, &ordine.CostoTotale,
 	)
 	if err != nil {
+		// Verifica se l'errore è dovuto all'assenza di righe
+		if err == pgx.ErrNoRows {
+			return nil, &models.ErrOrdineNonTrovato{
+				IDTavolo:        idTavolo,
+				StatoRichiesto:  "consegnato",
+				MessaggioErrore: "Nessun ordine in stato 'consegnato' trovato per il tavolo specificato",
+			}
+		}
 		return nil, err
 	}
 
@@ -162,18 +169,7 @@ func (r *OrdineRepository) CalcolaScontrino(ctx context.Context, idTavolo int) (
 	importoCoperto := costoCoperto * float64(ordine.NumPersone)
 	totaleComplessivo := ordine.CostoTotale + importoCoperto
 
-	// 4. Aggiorna lo stato dell'ordine a "pagato"
-	dataPagamento := time.Now()
-	_, err = tx.Exec(ctx, `
-		UPDATE ordine
-		SET stato = 'pagato', data_pagamento = $1
-		WHERE id_ordine = $2
-	`, dataPagamento, ordine.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	// 5. Crea lo scontrino
+	// 4. Crea lo scontrino
 	scontrino := &models.Scontrino{
 		IDOrdine:          ordine.ID,
 		IDTavolo:          ordine.IDTavolo,
@@ -183,7 +179,6 @@ func (r *OrdineRepository) CalcolaScontrino(ctx context.Context, idTavolo int) (
 		CostoCoperto:      costoCoperto,
 		ImportoCoperto:    importoCoperto,
 		TotaleComplessivo: totaleComplessivo,
-		DataPagamento:     dataPagamento,
 	}
 
 	// Commit della transazione

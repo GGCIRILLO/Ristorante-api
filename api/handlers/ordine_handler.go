@@ -143,7 +143,7 @@ func (h *OrdineHandler) DeleteOrdine(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// CalcolaScontrino calcola il conto per un tavolo e segna l'ordine come pagato
+// CalcolaScontrino calcola il conto per un tavolo
 func (h *OrdineHandler) CalcolaScontrino(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	idTavoloStr := chi.URLParam(r, "id_tavolo")
@@ -156,6 +156,13 @@ func (h *OrdineHandler) CalcolaScontrino(w http.ResponseWriter, r *http.Request)
 	// Calcola lo scontrino
 	scontrino, err := h.Repo.CalcolaScontrino(ctx, idTavolo)
 	if err != nil {
+		// Verifica se è un errore personalizzato ErrOrdineNonTrovato
+		if ordineErr, ok := err.(*models.ErrOrdineNonTrovato); ok {
+			http.Error(w, ordineErr.Error(), http.StatusNotFound)
+			log.Printf("Ordine non trovato: %v", ordineErr)
+			return
+		}
+		// Altrimenti è un errore generico
 		http.Error(w, "Errore nel calcolo dello scontrino", http.StatusInternalServerError)
 		log.Printf("Errore nel calcolo dello scontrino: %v", err)
 		return

@@ -154,6 +154,7 @@ func (h *TavoloHandler) CambiaStatoTavolo(w http.ResponseWriter, r *http.Request
 	}
 	_ = h.Cache.InvalidateTavoli(ctx)
 	_ = h.Cache.InvalidateTavoliLiberi(ctx)
+	_ = h.Cache.InvalidateTavoliOccupati(ctx)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(t)
@@ -173,6 +174,35 @@ func (h *TavoloHandler) GetTavoliLiberi(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		_ = h.Cache.SetTavoliLiberi(ctx, tavoli)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tavoli)
+}
+
+// GetTavoliOccupati restituisce i tavoli occupati per un ristorante specifico
+func (h *TavoloHandler) GetTavoliOccupati(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Prima cerca nella cache
+	tavoli, err := h.Cache.GetTavoliOccupati(ctx)
+	if err != nil {
+		log.Printf("Errore cache GetTavoliOccupati: %v", err)
+	}
+
+	// Se non è in cache, recupera dal database
+	if tavoli == nil {
+		tavoli, err = h.Repo.GetTavoliOccupati(ctx, 1) // Supponiamo ID ristorante 1
+		if err != nil {
+			http.Error(w, "Errore recupero tavoli occupati", http.StatusInternalServerError)
+			log.Printf("Errore recupero tavoli occupati: %v", err)
+			return
+		}
+
+		// Salva in cache
+		if err := h.Cache.SetTavoliOccupati(ctx, tavoli); err != nil {
+			log.Printf("Errore salvataggio tavoli occupati in cache: %v", err)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
