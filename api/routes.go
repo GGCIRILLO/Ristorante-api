@@ -104,7 +104,6 @@ func SetupRoutes(db *database.DB) *chi.Mux {
 			r.Delete("/{id}", pietanzaHandler.DeletePietanza)
 			r.Post("/ordine/{id_ordine}", pietanzaHandler.AddPietanzaToOrdine)
 			r.Post("/menu-fisso/ordine/{id_ordine}", pietanzaHandler.AddMenuFissoToOrdine)
-			r.Post("/ordine/{id_ordine}/bevanda", pietanzaHandler.AddBevandaToOrdine)
 		})
 
 		r.Route("/menu-fissi", func(r chi.Router) {
