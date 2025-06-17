@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS `ordine` (
   `id_tavolo` INT NOT NULL,
   `num_persone` INT NOT NULL,
   `data_ordine` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `stato` ENUM('in_attesa', 'in_preparazione', 'pronto', 'consegnato', 'pagato') NOT NULL DEFAULT 'in_attesa',
+  `stato` ENUM('in_attesa', 'confermato' , 'in_preparazione', 'pronto', 'consegnato', 'pagato') NOT NULL DEFAULT 'in_attesa',
   `id_ristorante` INT NOT NULL,
   `costo_totale` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   PRIMARY KEY (`id_ordine`),

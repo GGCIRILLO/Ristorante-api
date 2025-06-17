@@ -216,7 +216,7 @@ func (db *DB) InitSchema() error {
 		  id_tavolo INTEGER NOT NULL,
 		  num_persone INTEGER NOT NULL,
 		  data_ordine TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		  stato VARCHAR(20) NOT NULL DEFAULT 'in_attesa' CHECK (stato IN ('in_attesa', 'in_preparazione', 'pronto', 'consegnato', 'pagato')),
+		  stato VARCHAR(20) NOT NULL DEFAULT 'in_attesa' CHECK (stato IN ('in_attesa', 'confermato', 'in_preparazione', 'pronto', 'consegnato', 'pagato')),
 		  id_ristorante INTEGER NOT NULL,
 		  costo_totale DECIMAL(10,2) NOT NULL DEFAULT 0.00,
 		  FOREIGN KEY (id_tavolo) REFERENCES tavolo (id_tavolo) ON DELETE CASCADE,

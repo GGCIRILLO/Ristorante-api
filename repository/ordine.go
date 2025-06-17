@@ -28,7 +28,7 @@ func (r *OrdineRepository) Create(ctx context.Context, o *models.Ordine) error {
 
 // GetAll restituisce tutti gli ordini - utile per il Cuoco
 func (r *OrdineRepository) GetAll(ctx context.Context) ([]models.Ordine, error) {
-	rows, err := r.DB.Query(ctx, `SELECT id_ordine, id_tavolo, num_persone, data_ordine, stato, id_ristorante, costo_totale FROM ordine WHERE stato != 'pagato'  AND stato !='consegnato' ORDER BY data_ordine ASC`)
+	rows, err := r.DB.Query(ctx, `SELECT id_ordine, id_tavolo, num_persone, data_ordine, stato, id_ristorante, costo_totale FROM ordine WHERE stato != 'pagato' AND stato !='consegnato' ORDER BY data_ordine ASC`)
 	if err != nil {
 		return nil, err
 	}
